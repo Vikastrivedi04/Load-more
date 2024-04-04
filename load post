@@ -1,0 +1,103 @@
+function monst_enqueue_scripts()
+{
+	wp_enqueue_script('monst-load-more', get_template_directory_uri() . '/assets/js/load-more.js', array('jquery'), '1.0', true);
+	wp_localize_script(
+		'monst-load-more',
+		'monst_load_more_params',
+		array(
+			'ajaxurl' => admin_url('admin-ajax.php'),
+			'offset' => 4 // Set the initial offset here
+		)
+	);
+}
+add_action('wp_enqueue_scripts', 'monst_enqueue_scripts');
+
+
+
+
+function load_more_posts()
+{
+	$offset = $_POST['offset'];
+	$args = array(
+		'post_type' => 'post',
+		'posts_per_page' => 4,
+		'offset' => $offset
+	);
+	$posts_query = new WP_Query($args);
+
+	if ($posts_query->have_posts()) {
+		ob_start();
+		while ($posts_query->have_posts()) {
+			$posts_query->the_post();
+			?>
+			<div class="post">
+				<h2>
+					<?php the_title(); ?>
+				</h2>
+				<div class="post-content">
+					<?php the_excerpt(); ?>
+				</div>
+			</div>
+			<?php
+		}
+		wp_send_json_success(ob_get_clean());
+	} else {
+		wp_send_json_error('No more posts to load');
+	}
+
+	wp_die();
+}
+
+
+//    Front page   //
+
+ <div class="post">
+                <?php
+                $args = array(
+                    'post_type' => 'post',
+                    'posts_per_page' => 4 // Show only first 4 posts initially
+                );
+                $posts_query = new WP_Query($args);
+                ?>
+
+                <div id="post-container" class="row">
+                    <?php if ($posts_query->have_posts()): ?>
+                        <?php while ($posts_query->have_posts()):
+                            $posts_query->the_post(); ?>
+                            <div class="col-4">
+                                <h2>
+                                    <?php the_title(); ?>
+                                </h2>
+                                <div class="post-content">
+                                    <?php the_excerpt(); ?>
+                                </div>
+                            </div>
+                        <?php endwhile; ?>
+                    <?php endif; ?>
+                </div>
+                <button id="load-more">Load More</button>
+            </div>
+
+/*        load-more.js     */
+
+jQuery(function ($) {
+  $("#load-more").on("click", function () {
+    var offset = monst_load_more_params.offset;
+    $.ajax({
+      url: monst_load_more_params.ajaxurl,
+      type: "post",
+      data: {
+        action: "load_more_posts",
+        offset: offset,
+      },
+      success: function (response) {
+        if (response.success) {
+          $("#post-container").append(response.data);
+          monst_load_more_params.offset += 4; // Update offset
+        } else {
+          alert(response.data);
+        }
+      },
+    });
+  });
+});
